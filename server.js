@@ -24,6 +24,8 @@ io.on('connection', (socket) => {
       players: [player],
       hostId: player.id,
       promptIds: [],
+      currentRound: 1,
+      roundCount: 5,
       status: 'lobby',
     };
     socket.join(gameCode);
@@ -41,12 +43,24 @@ io.on('connection', (socket) => {
     io.to(gameCode).emit('player-list', game.players);
   });
 
-  socket.on('start-game', ({ gameCode, promptIds }) => {
+  socket.on('start-game', ({ gameCode, promptIds, promptGen, roundCount, hostId }) => {
     const game = games[gameCode];
     if (!game) return;
     game.status = 'playing';
     game.promptIds = promptIds;
-    io.to(gameCode).emit('game-started', { promptIds });
+    game.promptGen = promptGen;
+    game.roundCount = roundCount;
+    game.currentRound = 1;
+    game.hostId = hostId;
+
+    io.to(gameCode).emit('game-started', {
+      promptIds,
+      promptGen,
+      roundCount,
+      currentRound: 1,
+      status: 'intro',
+      hostId,
+    });
   });
 
   socket.on('submit-vote', ({ gameCode, playerId, vote }) => {
@@ -65,9 +79,61 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('next-round', ({ gameCode }) => {
+    const game = games[gameCode];
+    if (!game) return;
+
+    // Score the round
+    const voteCounts = {};
+    game.players.forEach(p => {
+      voteCounts[p.vote] = (voteCounts[p.vote] || 0) + 1;
+    });
+
+    game.players = game.players.map(p => {
+      const isUnique = voteCounts[p.vote] === 1;
+      return {
+        ...p,
+        score: isUnique ? (p.score || 0) + 1 : (p.score || 0),
+        vote: 0,
+        hasVoted: false,
+      };
+    });
+
+    // Move to next round
+    game.currentRound += 1;
+
+    const isGameOver = game.currentRound > game.roundCount;
+
+    io.to(gameCode).emit('round-data', {
+      updatedPlayers: game.players,
+      currentRound: game.currentRound,
+      isGameOver,
+      promptIds: game.promptIds,
+      promptGen: game.promptGen,
+      roundCount: game.roundCount,
+      status: game.status,
+      hostId: game.hostId,
+    });
+  });
+
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
     // Optional: remove from games
+  });
+
+  socket.on('restart-game', ({ gameCode, updatedPlayers, promptIds }) => {
+    const game = games[gameCode];
+    if (!game) return;
+    game.players = updatedPlayers;
+    game.promptIds = promptIds;
+    game.currentRound = 1;
+    game.status = 'intro';
+    io.to(gameCode).emit('restart-game', { updatedPlayers, promptIds });
+  });
+
+  socket.on('end-game', ({ gameCode }) => {
+    delete games[gameCode];
+    io.to(gameCode).emit('end-game');
   });
 });
 
