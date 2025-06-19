@@ -63,6 +63,24 @@ io.on('connection', (socket) => {
     });
   });
 
+  socket.on('start-round', ({ gameCode }) => {
+    const game = games[gameCode];
+    if (!game) return;
+
+    game.status = 'playing';
+
+    io.to(gameCode).emit('round-data', {
+      updatedPlayers: game.players,
+      currentRound: game.currentRound,
+      isGameOver: false,
+      promptIds: game.promptIds,
+      promptGen: game.promptGen,
+      roundCount: game.roundCount,
+      status: 'playing',
+      hostId: game.hostId,
+    });
+  });
+
   socket.on('submit-vote', ({ gameCode, playerId, vote }) => {
     const game = games[gameCode];
     if (!game) return;
