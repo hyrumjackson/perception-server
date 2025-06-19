@@ -119,31 +119,25 @@ io.on('connection', (socket) => {
     const game = games[gameCode];
     if (!game) return;
 
-    // Score the round
-    const voteCounts = {};
-    game.players.forEach(p => {
-      voteCounts[p.vote] = (voteCounts[p.vote] || 0) + 1;
-    });
-
-    game.players = game.players.map(p => {
-      const isUnique = voteCounts[p.vote] === 1;
-      return {
-        ...p,
-        score: isUnique ? (p.score || 0) + 1 : (p.score || 0),
-        vote: 0,
-        hasVoted: false,
-      };
-    });
-
-    // Move to next round
     game.currentRound += 1;
 
-    const isGameOver = game.currentRound > game.roundCount;
+    // Reset votes
+    game.players.forEach(p => {
+      p.vote = null;
+      p.hasVoted = false;
+    });
+
+    // If it's the final round
+    if (game.currentRound > game.roundCount) {
+      game.status = 'final';
+    } else {
+      game.status = 'playing';
+    }
 
     io.to(gameCode).emit('round-data', {
       updatedPlayers: game.players,
       currentRound: game.currentRound,
-      isGameOver,
+      isGameOver: game.currentRound > game.roundCount,
       promptIds: game.promptIds,
       promptGen: game.promptGen,
       roundCount: game.roundCount,
