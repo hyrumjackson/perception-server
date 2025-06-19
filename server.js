@@ -43,6 +43,14 @@ io.on('connection', (socket) => {
     io.to(gameCode).emit('player-list', game.players);
   });
 
+  socket.on('enter-settings', ({ gameCode }) => {
+    const game = games[gameCode];
+    if (!game) return;
+
+    game.status = 'settings';
+    io.to(gameCode).emit('status-update', { status: 'settings' });
+  });
+
   socket.on('start-game', ({ gameCode, promptIds, promptGen, roundCount, hostId }) => {
     const game = games[gameCode];
     if (!game) return;
