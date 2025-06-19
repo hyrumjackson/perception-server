@@ -102,14 +102,14 @@ io.on('connection', (socket) => {
     const allVoted = game.players.every(p => p.hasVoted);
     if (allVoted) {
       game.status = 'results';
-      io.to(gameCode).emit('round-data', {
+      io.to(gameCode).emit('all-voted', {
         updatedPlayers: game.players,
         currentRound: game.currentRound,
         isGameOver: false,
         promptIds: game.promptIds,
         promptGen: game.promptGen,
         roundCount: game.roundCount,
-        status: game.status, // now 'results'
+        status: game.status,
         hostId: game.hostId,
       });
     }
